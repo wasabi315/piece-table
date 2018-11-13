@@ -1,85 +1,107 @@
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RecordWildCards #-}
 -------------------------------------------------------------------------------
 --
 -- Module   : Lib
--- Author   : wasabi315 (https://github.com/wasabi315)
+-- Author   : wasabi (https://github.com/wasabi315)
 --
--- Simple Piece Table implementation.
+-- Simple Piece Table implementation in Haskell.
 --
 -------------------------------------------------------------------------------
 
 module Lib where
 
-import           Data.Foldable      as F
-import           Data.Maybe         ( fromJust )
-import qualified Data.Sequence      as S
+import           Data.FingerTree     ( ViewL(..) )
+import qualified Data.FingerTree     as F
+import           Data.Maybe          ( fromJust )
+import           Data.Monoid         ( Sum(..) )
+import qualified Data.Sequence       as S
 
 -------------------------------------------------------------------------------
--- Types
+-- Types and Instances
 
-type Position = Int
-
+-- FileType
 data FileType
     = Orig
     | Add
   deriving ( Eq, Show )
 
+-- Piece
 data Piece = Piece
     { fileType :: !FileType
-    , start    :: !Position
-    , size     :: !Int
+    , start    :: !Int
+    , len      :: !Int
     }
 
+instance F.Measured (Sum Int) Piece where
+    measure = Sum . len
+
+-- PieceTable
 data PieceTable = PieceTable
-    { table      :: S.Seq Piece
-    , origBuffer :: S.Seq Char
-    , addBuffer  :: S.Seq Char
+    { table    :: Table
+    , origFile :: S.Seq Char
+    , addFile  :: S.Seq Char
     }
 
--------------------------------------------------------------------------------
--- Utils
+type Table = F.FingerTree (Sum Int) Piece
 
-slice :: Position -> Int -> S.Seq a -> S.Seq a
-slice start size = S.take size . S.drop start
+instance Show PieceTable where
+    show PieceTable {..} = undefined
 
 -------------------------------------------------------------------------------
--- Construction and Deconstrunction
+-- Constructions and Deconstruction
 
 empty :: PieceTable
 empty = PieceTable
-    { table      = S.empty
-    , origBuffer = S.empty
-    , addBuffer  = S.empty
+    { table    = F.empty
+    , origFile = S.empty
+    , addFile  = S.empty
     }
 
 fromString :: String -> PieceTable
 fromString str = empty
-    { table      = S.singleton piece
-    , origBuffer = S.fromList str
+    { table    = F.singleton piece
+    , origFile = S.fromList str
     }
   where
-    len = length str
     piece = Piece
         { fileType = Orig
         , start    = 0
-        , size     = len
+        , len      = length str
         }
 
 toString :: PieceTable -> String
-toString PieceTable {..} = F.concat . fmap mkString $ table
-  where
-    mkString :: Piece -> String
-    mkString Piece {..} = case fileType of
-        Orig -> F.toList $ slice start size origBuffer
-        Add  -> F.toList $ slice start size addBuffer
+toString PieceTable {..} = undefined
 
 -------------------------------------------------------------------------------
 -- Operations
 
-insert :: String -> Position -> PieceTable -> PieceTable
-insert str at tbl@PieceTable {..} = undefined
+splitPiece :: Int -> Piece -> (Piece, Piece)
+splitPiece at piece@Piece {..} =
+    ( piece { len = at }
+    , piece { start = start + len, len = len - at }
+    )
 
-delete :: Position -> Position -> PieceTable -> PieceTable
-delete from to tbl@PieceTable {..} = undefined
+splitTable :: Int -> Table -> (Table, Table)
+splitTable at table = undefined
+
+insert :: Int -> String -> PieceTable -> PieceTable
+insert at str tbl@PieceTable {..} = tbl
+    { table   = left <> F.singleton newPiece <> right
+    , addFile = addFile <> S.fromList str
+    }
+  where
+    (left, right) = splitTable at table
+    newPiece      = Piece
+        { fileType = Add
+        , start    = S.length addFile
+        , len      = length str
+        }
+
+delete :: Int -> Int -> PieceTable -> PieceTable
+delete from to tbl@PieceTable {..} = tbl { table = left <> right }
+  where
+    (left, rest) = splitTable from table
+    (_, right)   = splitTable (to - from) rest
 
