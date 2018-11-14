@@ -14,6 +14,7 @@ module Lib where
 
 import           Data.FingerTree     ( ViewL(..) )
 import qualified Data.FingerTree     as F
+import           Data.Foldable       ( foldl', toList )
 import           Data.Maybe          ( fromJust )
 import           Data.Monoid         ( Sum(..) )
 import qualified Data.Sequence       as S
@@ -47,7 +48,19 @@ data PieceTable = PieceTable
 type Table = F.FingerTree (Sum Int) Piece
 
 instance Show PieceTable where
-    show PieceTable {..} = undefined
+    show p@PieceTable {..}
+        =  "String : " ++ toString p      ++ "\n"
+        ++ "Original : " ++ toList origFile ++ "\n"
+        ++ "Add : " ++ toList addFile  ++ "\n"
+        ++ "Piece : \n"
+        ++ foldMap showPiece table
+      where
+        showPiece :: Piece -> String
+        showPiece Piece {..}
+            =  "  "
+            ++ show fileType ++ " "
+            ++ show start ++ " "
+            ++ show len ++ " "
 
 -------------------------------------------------------------------------------
 -- Constructions and Deconstruction
@@ -71,8 +84,19 @@ fromString str = empty
         , len      = length str
         }
 
+slice :: Int -> Int -> S.Seq a -> S.Seq a
+slice p l = S.take l . S.drop p
+
+toSubstring :: Piece -> S.Seq Char -> S.Seq Char
+toSubstring Piece {..} = slice start len
+
 toString :: PieceTable -> String
-toString PieceTable {..} = undefined
+toString PieceTable {..} = toList $ foldl' mkSubString S.empty table
+  where
+    mkSubString :: S.Seq Char -> Piece -> S.Seq Char
+    mkSubString cs p@Piece {..} = case fileType of
+        Orig -> toSubstring p origFile
+        Add  -> toSubstring p addFile
 
 -------------------------------------------------------------------------------
 -- Operations
