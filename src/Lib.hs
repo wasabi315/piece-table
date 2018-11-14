@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE StrictData #-}
 -------------------------------------------------------------------------------
 --
 -- Module   : Lib
@@ -30,9 +31,9 @@ data FileType
 
 -- Piece
 data Piece = Piece
-    { fileType :: !FileType
-    , start    :: !Int
-    , len      :: !Int
+    { fileType :: FileType
+    , start    :: Int
+    , len      :: Int
     }
 
 instance Show Piece where
@@ -55,9 +56,9 @@ type Table = F.FingerTree (Sum Int) Piece
 
 instance Show PieceTable where
     show p@PieceTable {..}
-        =  "String : " ++ toString p      ++ "\n"
+        =  "String : " ++ toString p ++ "\n"
         ++ "Original : " ++ toList origFile ++ "\n"
-        ++ "Add : " ++ toList addFile  ++ "\n"
+        ++ "Add : " ++ toList addFile ++ "\n"
         ++ "Piece : \n"
         ++ foldMap (\p -> "  " ++ show p ++ "\n") table
 
