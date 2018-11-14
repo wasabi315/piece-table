@@ -12,7 +12,7 @@
 
 module Lib where
 
-import           Data.FingerTree     ( ViewL(..) )
+import           Data.FingerTree     ( ViewL(..), (|>), (<|) )
 import qualified Data.FingerTree     as F
 import           Data.Foldable       ( foldl', toList )
 import           Data.Maybe          ( fromJust )
@@ -35,6 +35,12 @@ data Piece = Piece
     , len      :: !Int
     }
 
+instance Show Piece where
+    show Piece {..}
+        =  show fileType ++ " "
+        ++ show start ++ " "
+        ++ show len
+
 instance F.Measured (Sum Int) Piece where
     measure = Sum . len
 
@@ -53,14 +59,7 @@ instance Show PieceTable where
         ++ "Original : " ++ toList origFile ++ "\n"
         ++ "Add : " ++ toList addFile  ++ "\n"
         ++ "Piece : \n"
-        ++ foldMap showPiece table
-      where
-        showPiece :: Piece -> String
-        showPiece Piece {..}
-            =  "  "
-            ++ show fileType ++ " "
-            ++ show start ++ " "
-            ++ show len ++ " "
+        ++ foldMap (\p -> "  " ++ show p ++ "\n") table
 
 -------------------------------------------------------------------------------
 -- Constructions and Deconstruction
@@ -91,10 +90,10 @@ toSubstring :: Piece -> S.Seq Char -> S.Seq Char
 toSubstring Piece {..} = slice start len
 
 toString :: PieceTable -> String
-toString PieceTable {..} = toList $ foldl' mkSubString S.empty table
+toString PieceTable {..} = toList $ foldMap mkSubString table
   where
-    mkSubString :: S.Seq Char -> Piece -> S.Seq Char
-    mkSubString cs p@Piece {..} = case fileType of
+    mkSubString :: Piece -> S.Seq Char
+    mkSubString p@Piece {..} = case fileType of
         Orig -> toSubstring p origFile
         Add  -> toSubstring p addFile
 
@@ -104,11 +103,20 @@ toString PieceTable {..} = toList $ foldl' mkSubString S.empty table
 splitPiece :: Int -> Piece -> (Piece, Piece)
 splitPiece at piece@Piece {..} =
     ( piece { len = at }
-    , piece { start = start + len, len = len - at }
+    , piece { start = start + at, len = len - at }
     )
 
 splitTable :: Int -> Table -> (Table, Table)
-splitTable at table = undefined
+splitTable at table
+    | diff == 0 = (ls, rs)
+    | F.null rs = (ls, rs)
+    | p :< rs' <- F.viewl rs = if diff > len p
+        then (ls |> p, rs')
+        else let (lp, rp) = splitPiece diff p
+             in  (ls |> lp, rp <| rs')
+  where
+    (ls, rs) = F.split (Sum at <) table
+    diff     = at - getSum (F.measure ls)
 
 insert :: Int -> String -> PieceTable -> PieceTable
 insert at str tbl@PieceTable {..} = tbl
@@ -127,5 +135,5 @@ delete :: Int -> Int -> PieceTable -> PieceTable
 delete from to tbl@PieceTable {..} = tbl { table = left <> right }
   where
     (left, rest) = splitTable from table
-    (_, right)   = splitTable (to - from) rest
+    (_, right)   = splitTable (to - from + 1) rest
 
