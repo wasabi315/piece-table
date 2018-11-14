@@ -1,2 +1,2 @@
 # PieceTable
-Simple Piece Table implementation.
+Simple Piece Table implementation in Haskell.
