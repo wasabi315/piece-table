@@ -24,8 +24,8 @@ import qualified Data.Sequence       as S
 
 -- FileType
 data FileType
-    = Orig
-    | Add
+    = Orig       -- Original File
+    | Add        -- Add File
   deriving ( Eq, Show )
 
 -- Piece
@@ -64,6 +64,7 @@ instance Show PieceTable where
 -------------------------------------------------------------------------------
 -- Constructions and Deconstruction
 
+-- Empty PieceTable.
 empty :: PieceTable
 empty = PieceTable
     { table    = F.empty
@@ -71,6 +72,7 @@ empty = PieceTable
     , addFile  = S.empty
     }
 
+-- Create PieceTable from String.
 fromString :: String -> PieceTable
 fromString str = empty
     { table    = F.singleton piece
@@ -83,12 +85,15 @@ fromString str = empty
         , len      = length str
         }
 
+-- Yield the slice of the sequence.
 slice :: Int -> Int -> S.Seq a -> S.Seq a
 slice p l = S.take l . S.drop p
 
+-- Get substring of the file that the piece refers to.
 toSubstring :: Piece -> S.Seq Char -> S.Seq Char
 toSubstring Piece {..} = slice start len
 
+-- Convert PieceTable to String.
 toString :: PieceTable -> String
 toString PieceTable {..} = toList $ foldMap mkSubString table
   where
@@ -100,24 +105,27 @@ toString PieceTable {..} = toList $ foldMap mkSubString table
 -------------------------------------------------------------------------------
 -- Operations
 
+-- Split Piece at the specified position.
 splitPiece :: Int -> Piece -> (Piece, Piece)
 splitPiece at piece@Piece {..} =
     ( piece { len = at }
     , piece { start = start + at, len = len - at }
     )
 
+-- Split Table at the specified position.
+-- TODO : fix ugly code.
 splitTable :: Int -> Table -> (Table, Table)
 splitTable at table
-    | diff == 0 = (ls, rs)
-    | F.null rs = (ls, rs)
+    | diff == 0 = ps
+    | F.null rs = ps
     | p :< rs' <- F.viewl rs = if diff > len p
         then (ls |> p, rs')
-        else let (lp, rp) = splitPiece diff p
-             in  (ls |> lp, rp <| rs')
+        else let (lp, rp) = splitPiece diff p in  (ls |> lp, rp <| rs')
   where
-    (ls, rs) = F.split (Sum at <) table
+    ps@(ls, rs) = F.split (Sum at <) table
     diff     = at - getSum (F.measure ls)
 
+-- Insert String at specified Position.
 insert :: Int -> String -> PieceTable -> PieceTable
 insert at str tbl@PieceTable {..} = tbl
     { table   = left <> F.singleton newPiece <> right
@@ -131,6 +139,7 @@ insert at str tbl@PieceTable {..} = tbl
         , len      = length str
         }
 
+-- Delete String of the specified range from PieceTable.
 delete :: Int -> Int -> PieceTable -> PieceTable
 delete from to tbl@PieceTable {..} = tbl { table = left <> right }
   where
