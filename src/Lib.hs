@@ -15,7 +15,7 @@ module Lib where
 
 import           Data.FingerTree     ( ViewL(..), (|>), (<|) )
 import qualified Data.FingerTree     as F
-import           Data.Foldable       ( foldl', toList )
+import           Data.Foldable       ( toList )
 import           Data.Maybe          ( fromJust )
 import           Data.Monoid         ( Sum(..) )
 import qualified Data.Sequence       as S
@@ -36,11 +36,13 @@ data Piece = Piece
     , len      :: Int
     }
 
+-- Show instance for Piece
 instance Show Piece where
-    show Piece {..}
-        =  show fileType ++ " "
-        ++ show start ++ " "
-        ++ show len
+    show Piece {..} = unwords
+        [ show fileType
+        , show start
+        , show len
+        ]
 
 instance F.Measured (Sum Int) Piece where
     measure = Sum . len
@@ -54,13 +56,15 @@ data PieceTable = PieceTable
 
 type Table = F.FingerTree (Sum Int) Piece
 
+-- Show instance for PieceTable
 instance Show PieceTable where
-    show p@PieceTable {..}
-        =  "String : " ++ toString p ++ "\n"
-        ++ "Original : " ++ toList origFile ++ "\n"
-        ++ "Add : " ++ toList addFile ++ "\n"
-        ++ "Piece : \n"
-        ++ foldMap (\p -> "  " ++ show p ++ "\n") table
+    show p@PieceTable {..} = unlines $
+        [ "String   : " ++ toString p
+        , "Original : " ++ toList origFile
+        , "Add      : " ++ toList addFile
+        , "Pieces:"
+        ] ++
+        map (("  " ++) . show) (toList table)
 
 -------------------------------------------------------------------------------
 -- Constructions and Deconstruction
