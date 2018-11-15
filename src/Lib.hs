@@ -127,7 +127,7 @@ splitTable at table
         else let (lp, rp) = splitPiece diff p in  (ls |> lp, rp <| rs')
   where
     ps@(ls, rs) = F.split (Sum at <) table
-    diff     = at - getSum (F.measure ls)
+    diff        = at - getSum (F.measure ls)
 
 -- Insert String at specified Position.
 insert :: Int -> String -> PieceTable -> PieceTable
