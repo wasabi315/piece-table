@@ -13,7 +13,7 @@
 
 module Lib where
 
-import           Data.FingerTree     ( ViewL(..), (|>), (<|) )
+import           Data.FingerTree     ( ViewL(..), (|>), (<|), (><) )
 import qualified Data.FingerTree     as F
 import           Data.Foldable       ( toList )
 import           Data.Maybe          ( fromJust )
@@ -133,8 +133,8 @@ splitTable at table
 -- Insert String at specified Position.
 insert :: Int -> String -> PieceTable -> PieceTable
 insert at str tbl@PieceTable {..} = tbl
-    { table   = left <> F.singleton newPiece <> right
-    , addFile = addFile <> T.pack str
+    { table   = left >< F.singleton newPiece >< right
+    , addFile = addFile `T.append` T.pack str
     }
   where
     (left, right) = splitTable at table
@@ -146,7 +146,7 @@ insert at str tbl@PieceTable {..} = tbl
 
 -- Delete String of the specified range from PieceTable.
 delete :: Int -> Int -> PieceTable -> PieceTable
-delete from to tbl@PieceTable {..} = tbl { table = left <> right }
+delete from to tbl@PieceTable {..} = tbl { table = left >< right }
   where
     (left, rest) = splitTable from table
     (_, right)   = splitTable (to - from + 1) rest
