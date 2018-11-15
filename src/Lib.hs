@@ -16,7 +16,6 @@ module Lib where
 import           Data.FingerTree     ( ViewL(..), (|>), (<|), (><) )
 import qualified Data.FingerTree     as F
 import           Data.Foldable       ( toList )
-import           Data.Maybe          ( fromJust )
 import           Data.Monoid         ( Sum(..) )
 import qualified Data.Text           as T
 
