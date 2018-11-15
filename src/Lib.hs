@@ -18,7 +18,7 @@ import qualified Data.FingerTree     as F
 import           Data.Foldable       ( toList )
 import           Data.Maybe          ( fromJust )
 import           Data.Monoid         ( Sum(..) )
-import qualified Data.Sequence       as S
+import qualified Data.Text           as T
 
 -------------------------------------------------------------------------------
 -- Types and Instances
@@ -50,8 +50,8 @@ instance F.Measured (Sum Int) Piece where
 -- PieceTable
 data PieceTable = PieceTable
     { table    :: Table
-    , origFile :: S.Seq Char
-    , addFile  :: S.Seq Char
+    , origFile :: T.Text
+    , addFile  :: T.Text
     }
 
 type Table = F.FingerTree (Sum Int) Piece
@@ -60,8 +60,8 @@ type Table = F.FingerTree (Sum Int) Piece
 instance Show PieceTable where
     show p@PieceTable {..} = unlines $
         [ "String   : " ++ toString p
-        , "Original : " ++ toList origFile
-        , "Add      : " ++ toList addFile
+        , "Original : " ++ T.unpack origFile
+        , "Add      : " ++ T.unpack addFile
         , "Pieces:"
         ] ++
         map (("  " ++) . show) (toList table)
@@ -73,15 +73,15 @@ instance Show PieceTable where
 empty :: PieceTable
 empty = PieceTable
     { table    = F.empty
-    , origFile = S.empty
-    , addFile  = S.empty
+    , origFile = T.empty
+    , addFile  = T.empty
     }
 
 -- Create PieceTable from String.
 fromString :: String -> PieceTable
 fromString str = empty
     { table    = F.singleton piece
-    , origFile = S.fromList str
+    , origFile = T.pack str
     }
   where
     piece = Piece
@@ -90,19 +90,19 @@ fromString str = empty
         , len      = length str
         }
 
--- Yield the slice of the sequence.
-slice :: Int -> Int -> S.Seq a -> S.Seq a
-slice p l = S.take l . S.drop p
+-- Yield the slice of the text.
+slice :: Int -> Int -> T.Text -> T.Text
+slice p l = T.take l . T.drop p
 
 -- Get substring of the file that the piece refers to.
-toSubstring :: Piece -> S.Seq Char -> S.Seq Char
+toSubstring :: Piece -> T.Text -> T.Text
 toSubstring Piece {..} = slice start len
 
 -- Convert PieceTable to String.
 toString :: PieceTable -> String
-toString PieceTable {..} = toList $ foldMap mkSubString table
+toString PieceTable {..} = T.unpack $ foldMap mkSubString table
   where
-    mkSubString :: Piece -> S.Seq Char
+    mkSubString :: Piece -> T.Text
     mkSubString p@Piece {..} = case fileType of
         Orig -> toSubstring p origFile
         Add  -> toSubstring p addFile
@@ -134,13 +134,13 @@ splitTable at table
 insert :: Int -> String -> PieceTable -> PieceTable
 insert at str tbl@PieceTable {..} = tbl
     { table   = left <> F.singleton newPiece <> right
-    , addFile = addFile <> S.fromList str
+    , addFile = addFile <> T.pack str
     }
   where
     (left, right) = splitTable at table
     newPiece      = Piece
         { fileType = Add
-        , start    = S.length addFile
+        , start    = T.length addFile
         , len      = length str
         }
 
