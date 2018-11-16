@@ -16,9 +16,9 @@ module Lib where
 import           Data.FingerTree     ( ViewL(..), (|>), (<|), (><) )
 import qualified Data.FingerTree     as F
 import           Data.Foldable       ( toList )
-import           Data.List           ( intercalate )
 import           Data.Monoid         ( Sum(..) )
 import qualified Data.Text           as T
+import qualified Data.Text.IO        as TIO
 
 -------------------------------------------------------------------------------
 -- Types and Instances
@@ -101,6 +101,20 @@ fromString str = empty
         { fileType = Orig
         , start    = 0
         , len      = length str
+        }
+
+-- Reads a file and return contents as PieceTable.
+fromFile :: FilePath -> IO PieceTable
+fromFile path = do
+    txt <- TIO.readFile path
+    let piece = Piece
+            { fileType = Orig
+            , start    = 0
+            , len      = T.length txt
+            }
+    return $! empty
+        { table    = F.singleton piece
+        , origFile = txt
         }
 
 -- Yield the substring of the file that the piece refers to.
