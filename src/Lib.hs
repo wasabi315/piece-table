@@ -103,7 +103,7 @@ fromString str = empty
         , len      = length str
         }
 
--- Reads a file and return contents as PieceTable.
+-- Reads a file and returns contents as PieceTable.
 fromFile :: FilePath -> IO PieceTable
 fromFile path = do
     txt <- TIO.readFile path
