@@ -37,7 +37,7 @@ data Piece = Piece
     }
 
 -- Show instance for Piece.
--- Render the PieceTable for debugging.
+-- Render the Piece for debugging.
 instance Show Piece where
     show Piece {..} = unwords . map (justify 4) $
         [ show fileType
@@ -63,6 +63,7 @@ data PieceTable = PieceTable
 type Table = F.FingerTree (Sum Int) Piece
 
 -- Show instance for PieceTable.
+-- Render the PieceTable for debugging.
 instance Show PieceTable where
     show p@PieceTable {..} = unlines $
         [ "Text sequence :"
