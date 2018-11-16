@@ -16,54 +16,67 @@ module Lib where
 import           Data.FingerTree     ( ViewL(..), (|>), (<|), (><) )
 import qualified Data.FingerTree     as F
 import           Data.Foldable       ( toList )
+import           Data.List           ( intercalate )
 import           Data.Monoid         ( Sum(..) )
 import qualified Data.Text           as T
 
 -------------------------------------------------------------------------------
 -- Types and Instances
 
--- FileType
+-- FileType.
 data FileType
-    = Orig       -- Original File
-    | Add        -- Add File
+    = Orig    -- Original File
+    | Add     -- Add File
   deriving ( Eq, Show )
 
--- Piece
+-- Each Piece points to a span in the original or add file.
 data Piece = Piece
-    { fileType :: FileType
-    , start    :: Int
-    , len      :: Int
+    { fileType :: FileType    -- Which file the Piece refers to.
+    , start    :: Int         -- Offset into the the file.
+    , len      :: Int         -- The length of the piece.
     }
 
--- Show instance for Piece
+-- Show instance for Piece.
+-- Render the PieceTable for debugging.
 instance Show Piece where
-    show Piece {..} = unwords
+    show Piece {..} = unwords . map (justify 4) $
         [ show fileType
         , show start
         , show len
         ]
+      where
+        justify n = take n . (++ repeat ' ')
 
+-- Measured instance for Piece.
+-- Each Piece is measured by its length.
 instance F.Measured (Sum Int) Piece where
     measure = Sum . len
 
--- PieceTable
+-- The PieceTable.
 data PieceTable = PieceTable
-    { table    :: Table
-    , origFile :: T.Text
-    , addFile  :: T.Text
+    { table    :: Table     -- Sequence of the Piece.
+    , origFile :: T.Text    -- Original file (read only).
+    , addFile  :: T.Text    -- Add file (append only).
     }
 
+-- Type synonym for the finger tree of the Piece.
 type Table = F.FingerTree (Sum Int) Piece
 
--- Show instance for PieceTable
+-- Show instance for PieceTable.
 instance Show PieceTable where
     show p@PieceTable {..} = unlines $
-        [ "String   : " ++ toString p
-        , "Original : " ++ T.unpack origFile
-        , "Add      : " ++ T.unpack addFile
-        , "Pieces:"
+        [ "Text sequence :"
+        , indentEach $ toString p
+        , "Original file :"
+        , indentEach $ T.unpack origFile
+        , "Add file :"
+        , indentEach $ T.unpack addFile
+        , "PieceTable:"
         ] ++
-        map (("  " ++) . show) (toList table)
+        map (indent . show) (toList table)
+      where
+        indent = ("  " ++)
+        indentEach = unlines . map indent . lines
 
 -------------------------------------------------------------------------------
 -- Constructions and Deconstruction
@@ -89,13 +102,9 @@ fromString str = empty
         , len      = length str
         }
 
--- Yield the slice of the text.
-slice :: Int -> Int -> T.Text -> T.Text
-slice p l = T.take l . T.drop p
-
--- Get substring of the file that the piece refers to.
+-- Yield the substring of the file that the piece refers to.
 toSubstring :: Piece -> T.Text -> T.Text
-toSubstring Piece {..} = slice start len
+toSubstring Piece {..}= T.take len . T.drop start
 
 -- Convert PieceTable to String.
 toString :: PieceTable -> String
@@ -129,7 +138,7 @@ splitTable at table
     ps@(ls, rs) = F.split (Sum at <) table
     diff        = at - getSum (F.measure ls)
 
--- Insert String at specified Position.
+-- Insert a String at the specified position in the given PieceTable.
 insert :: Int -> String -> PieceTable -> PieceTable
 insert at str tbl@PieceTable {..} = tbl
     { table   = left >< F.singleton newPiece >< right
