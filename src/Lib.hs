@@ -39,13 +39,11 @@ data Piece = Piece
 -- Show instance for Piece.
 -- Render the Piece for debugging.
 instance Show Piece where
-    show Piece {..} = unwords . map (justify 4) $
+    show Piece {..} = unwords
         [ show fileType
         , show start
         , show len
         ]
-      where
-        justify n = take n . (++ repeat ' ')
 
 -- Measured instance for Piece.
 -- Each Piece is measured by its length.
@@ -79,6 +77,7 @@ instance Show PieceTable where
         , "Add file :"
         , indentEach $ T.unpack addFile
         , "PieceTable:"
+        , "  fileType start len"
         ] ++
         map (indent . show) (toList table)
       where
