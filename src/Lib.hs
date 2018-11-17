@@ -52,15 +52,21 @@ instance Show Piece where
 instance F.Measured (Sum Int) Piece where
     measure = Sum . len
 
+-- Type synonym for the FingerTree of the Piece.
+type Table = F.FingerTree (Sum Int) Piece
+
+-- Type synonym for the Text.
+type OrigFile = T.Text
+
+-- Type synonym for the Text.
+type AddFile = T.Text
+
 -- The PieceTable.
 data PieceTable = PieceTable
-    { table    :: Table     -- Sequence of the Piece.
-    , origFile :: T.Text    -- Original file (read only).
-    , addFile  :: T.Text    -- Add file (append only).
+    { table    :: Table       -- Sequence of the Piece.
+    , origFile :: OrigFile    -- Original file (read only).
+    , addFile  :: AddFile     -- Add file (append only).
     }
-
--- Type synonym for the finger tree of the Piece.
-type Table = F.FingerTree (Sum Int) Piece
 
 -- Show instance for PieceTable.
 -- Render the PieceTable for debugging.
