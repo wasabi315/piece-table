@@ -11,8 +11,8 @@ main = mapM_ print $ scanl (&) pt operations
 operations :: [PieceTable -> PieceTable]
 operations =
     [ insert 7 "silent "
-    , delete 0 4
+    , delete 0 5
     , insert 0 "Good night"
-    , delete 24 25
+    , delete 24 26
     , insert 100 "..."
     ]
