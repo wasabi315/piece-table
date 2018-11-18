@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE StrictData #-}
 -------------------------------------------------------------------------------
@@ -124,7 +125,7 @@ fromFile path = do
 
 -- Yield the substring of the file that the piece refers to.
 toSubstring :: Piece -> T.Text -> T.Text
-toSubstring Piece {..}= T.take len . T.drop start
+toSubstring Piece { len, start } = T.take len . T.drop start
 
 -- Convert PieceTable to String.
 toString :: PieceTable -> String
@@ -140,7 +141,7 @@ toString PieceTable {..} = T.unpack $ foldMap mkSubString table
 
 -- Split Piece at the specified position.
 splitPiece :: Int -> Piece -> (Piece, Piece)
-splitPiece at piece@Piece {..} =
+splitPiece at piece@Piece { start, len } =
     ( piece { len = at }
     , piece { start = start + at, len = len - at }
     )
@@ -160,13 +161,13 @@ splitTable at table
 
 -- Insert a String at the specified position in the given PieceTable.
 insert :: Int -> String -> PieceTable -> PieceTable
-insert at str tbl@PieceTable {..} = tbl
-    { table   = left >< F.singleton newPiece >< right
-    , addFile = addFile `T.append` T.pack str
+insert at str tbl@PieceTable { table, addFile } = tbl
+    { table   = l >< F.singleton p >< r
+    , addFile = T.append addFile (T.pack str)
     }
   where
-    (left, right) = splitTable at table
-    newPiece      = Piece
+    (l, r) = splitTable at table
+    p = Piece
         { fileType = Add
         , start    = T.length addFile
         , len      = length str
@@ -174,8 +175,21 @@ insert at str tbl@PieceTable {..} = tbl
 
 -- Delete String of the specified range from PieceTable.
 delete :: Int -> Int -> PieceTable -> PieceTable
-delete from to tbl@PieceTable {..} = tbl { table = left >< right }
+delete from to tbl@PieceTable { table } = tbl { table = l >< r }
   where
-    (left, rest) = splitTable from table
-    (_, right)   = splitTable (to - from + 1) rest
+    (l, _) = splitTable from table
+    (_, r) = splitTable to   table
+
+-- Yield the slice of the specified range of the Table.
+copy :: Int -> Int -> PieceTable -> Table
+copy from to PieceTable { table } = m
+  where
+    (_, r) = splitTable from table
+    (m, _) = splitTable (to - from) r
+
+-- Paste the Pieces to PieceTable.
+paste :: Int -> Table -> PieceTable -> PieceTable
+paste at t tbl@PieceTable { table } = tbl { table = l >< t >< r }
+  where
+    (l, r) = splitTable at table
 
