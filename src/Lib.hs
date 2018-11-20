@@ -1,8 +1,9 @@
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE StrictData #-}
+{-# LANGUAGE NamedFieldPuns        #-}
+{-# LANGUAGE RecordWildCards       #-}
+{-# LANGUAGE StrictData            #-}
+{-# LANGUAGE TemplateHaskell       #-}
 -------------------------------------------------------------------------------
 --
 -- Module   : Lib
@@ -14,6 +15,8 @@
 
 module Lib where
 
+import           Control.Lens
+import           Control.Monad       ( (<$!>) )
 import           Data.FingerTree     ( ViewL(..), (|>), (<|), (><) )
 import qualified Data.FingerTree     as F
 import           Data.Foldable       ( toList )
@@ -32,24 +35,26 @@ data FileType
 
 -- Each Piece points to a span in the original or add file.
 data Piece = Piece
-    { fileType :: FileType    -- Which file the Piece refers to.
-    , start    :: Int         -- Offset into the the file.
-    , len      :: Int         -- The length of the piece.
+    { _fileType :: FileType    -- Which file the Piece refers to.
+    , _start    :: Int         -- Offset into the the file.
+    , _len      :: Int         -- The length of the piece.
     }
+
+makeLenses ''Piece
 
 -- Show instance for Piece.
 -- Render the Piece for debugging.
 instance Show Piece where
     show Piece {..} = unwords
-        [ show fileType
-        , show start
-        , show len
+        [ show _fileType
+        , show _start
+        , show _len
         ]
 
 -- Measured instance for Piece.
 -- Each Piece is measured by its length.
 instance F.Measured (Sum Int) Piece where
-    measure = Sum . len
+    measure = Sum . _len
 
 -- Type synonym for the FingerTree of the Piece.
 type Table = F.FingerTree (Sum Int) Piece
@@ -62,10 +67,12 @@ type AddFile = T.Text
 
 -- The PieceTable.
 data PieceTable = PieceTable
-    { table    :: Table       -- Sequence of the Piece.
-    , origFile :: OrigFile    -- Original file (read only).
-    , addFile  :: AddFile     -- Add file (append only).
+    { _table    :: Table       -- Sequence of the Piece.
+    , _origFile :: OrigFile    -- Original file (read only).
+    , _addFile  :: AddFile     -- Add file (append only).
     }
+
+makeLenses ''PieceTable
 
 -- Show instance for PieceTable.
 -- Render the PieceTable for debugging.
@@ -74,13 +81,13 @@ instance Show PieceTable where
         [ "Text sequence :"
         , indentEach $ toString p
         , "Original file :"
-        , indentEach $ T.unpack origFile
+        , indentEach $ T.unpack _origFile
         , "Add file :"
-        , indentEach $ T.unpack addFile
+        , indentEach $ T.unpack _addFile
         , "PieceTable:"
         , "  fileType start len"
         ] ++
-        map (indent . show) (toList table)
+        map (indent . show) (toList _table)
       where
         indent = ("  " ++)
         indentEach = unlines . map indent . lines
@@ -91,59 +98,52 @@ instance Show PieceTable where
 -- Empty PieceTable.
 empty :: PieceTable
 empty = PieceTable
-    { table    = F.empty
-    , origFile = T.empty
-    , addFile  = T.empty
+    { _table    = F.empty
+    , _origFile = T.empty
+    , _addFile  = T.empty
     }
 
--- Create PieceTable from String.
-fromString :: String -> PieceTable
-fromString str = empty
-    { table    = F.singleton piece
-    , origFile = T.pack str
+-- Create PieceTable from Text.
+fromText :: T.Text -> PieceTable
+fromText txt = empty
+    { _table    = F.singleton piece
+    , _origFile = txt
     }
   where
     piece = Piece
-        { fileType = Orig
-        , start    = 0
-        , len      = length str
+        { _fileType = Orig
+        , _start    = 0
+        , _len      = T.length txt
         }
+
+-- See fromText.
+fromString :: String -> PieceTable
+fromString = fromText . T.pack
 
 -- Read a file and return contents as PieceTable.
 fromFile :: FilePath -> IO PieceTable
-fromFile path = do
-    txt <- TIO.readFile path
-    let piece = Piece
-            { fileType = Orig
-            , start    = 0
-            , len      = T.length txt
-            }
-    return $! empty
-        { table    = F.singleton piece
-        , origFile = txt
-        }
+fromFile path = fromText <$!> TIO.readFile path
 
 -- Yield the substring of the file that the piece refers to.
 toSubstring :: Piece -> T.Text -> T.Text
-toSubstring Piece { len, start } = T.take len . T.drop start
+toSubstring p = T.take (p ^. len) . T.drop (p ^. start)
 
 -- Convert PieceTable to String.
 toString :: PieceTable -> String
-toString PieceTable {..} = T.unpack $ foldMap mkSubString table
+toString pt = views table (T.unpack . foldMap mkSubString) pt
   where
     mkSubString :: Piece -> T.Text
-    mkSubString p@Piece {..} = case fileType of
-        Orig -> toSubstring p origFile
-        Add  -> toSubstring p addFile
+    mkSubString p = case p ^. fileType of
+        Orig -> views origFile (toSubstring p) pt
+        Add  -> views addFile  (toSubstring p) pt
 
 -------------------------------------------------------------------------------
--- Operations
 
 -- Split Piece at the specified position.
 splitPiece :: Int -> Piece -> (Piece, Piece)
-splitPiece at piece@Piece { start, len } =
-    ( piece { len = at }
-    , piece { start = start + at, len = len - at }
+splitPiece at piece =
+    ( set len at piece
+    , over start (+ at) . over len (subtract at) $ piece
     )
 
 -- Split Table at the specified position.
@@ -152,44 +152,61 @@ splitTable :: Int -> Table -> (Table, Table)
 splitTable at table
     | diff == 0 = ps
     | F.null rs = ps
-    | p :< rs' <- F.viewl rs = if diff > len p
-        then (ls |> p, rs')
-        else let (lp, rp) = splitPiece diff p in  (ls |> lp, rp <| rs')
+    | p F.:< rs' <- F.viewl rs = if diff > _len p
+        then (ls F.|> p, rs')
+        else let (lp, rp) = splitPiece diff p in  (ls F.|> lp, rp F.<| rs')
   where
     ps@(ls, rs) = F.split (Sum at <) table
     diff        = at - getSum (F.measure ls)
 
--- Insert a String at the specified position in the given PieceTable.
-insert :: Int -> String -> PieceTable -> PieceTable
-insert at str tbl@PieceTable { table, addFile } = tbl
-    { table   = l >< F.singleton p >< r
-    , addFile = T.append addFile (T.pack str)
-    }
+-- TODO : better name
+fill :: Table -> (Table, Table) -> Table
+fill m (l, r) = l >< m >< r
+
+leftOf, rightOf :: Int -> Table -> Table
+leftOf  i = fst . splitTable i
+rightOf i = snd . splitTable i
+
+-- Yield the slice of the Table.
+slice :: Int -> Int -> Table -> Table
+slice from to = leftOf (to - from) . rightOf from
+
+-------------------------------------------------------------------------------
+-- Editting Operations
+
+-- Insert Text at the specified position in the given PieceTable.
+insert :: Int -> T.Text -> PieceTable -> PieceTable
+insert at txt tbl
+    = tbl
+    & table %~ fill t . splitTable at
+    & addFile <>~ txt
   where
-    (l, r) = splitTable at table
-    p = Piece
-        { fileType = Add
-        , start    = T.length addFile
-        , len      = length str
+    t = F.singleton Piece
+        { _fileType = Add
+        , _start    = T.length (tbl ^. addFile)
+        , _len      = T.length txt
         }
+
+-- See insert.
+insert' :: Int -> String -> PieceTable -> PieceTable
+insert' at = insert at . T.pack
 
 -- Delete String of the specified range from PieceTable.
 delete :: Int -> Int -> PieceTable -> PieceTable
-delete from to tbl@PieceTable { table } = tbl { table = l >< r }
-  where
-    (l, _) = splitTable from table
-    (_, r) = splitTable to   table
+delete from to = table %~ ((><) <$> leftOf from <*> rightOf to)
 
 -- Yield the slice of the specified range of the Table.
 copy :: Int -> Int -> PieceTable -> Table
-copy from to PieceTable { table } = m
-  where
-    (_, r) = splitTable from table
-    (m, _) = splitTable (to - from) r
+copy from to = views table (slice from to)
 
 -- Paste the Pieces to PieceTable.
 paste :: Int -> Table -> PieceTable -> PieceTable
-paste at t tbl@PieceTable { table } = tbl { table = l >< t >< r }
+paste at t = table %~ fill t . splitTable at
+
+-- cut from to = copy from to &&& delete from to
+cut :: Int -> Int -> PieceTable -> (Table, PieceTable)
+cut from to pt = ( m, set table (l >< r) pt )
   where
-    (l, r) = splitTable at table
+    (l, mr) = splitTable from (pt ^. table)
+    (m, r)  = splitTable (to - from) mr
 
