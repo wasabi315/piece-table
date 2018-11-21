@@ -4,14 +4,14 @@
 {-# LANGUAGE TemplateHaskell       #-}
 -------------------------------------------------------------------------------
 --
--- Module   : Lib
+-- Module   : Data.PieceTable
 -- Author   : wasabi (https://github.com/wasabi315)
 --
 -- Simple Piece Table implementation in Haskell.
 --
 -------------------------------------------------------------------------------
 
-module Lib where
+module Data.PieceTable where
 
 import           Control.Lens        hiding ( (|>), (<|), (:<) )
 import           Control.Monad       ( (<$!>) )

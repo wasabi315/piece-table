@@ -1,11 +1,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
+import           Data.List        ( intersperse )
 import           Data.Function    ( (&) )
-import           Lib
+import           Data.PieceTable
 
 main :: IO ()
-main = mapM_ print $ scanl (&) pt operations
+main = mapM_ putStrLn
+    $ intersperse "--------------------"
+    $ map show
+    $ scanl (&) pt operations
   where
     pt = fromString "Hello, world!"
 
