@@ -1,8 +1,6 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE NamedFieldPuns        #-}
 {-# LANGUAGE RecordWildCards       #-}
-{-# LANGUAGE StrictData            #-}
 {-# LANGUAGE TemplateHaskell       #-}
 -------------------------------------------------------------------------------
 --
@@ -15,7 +13,7 @@
 
 module Lib where
 
-import           Control.Lens
+import           Control.Lens        hiding ( (|>), (<|), (:<) )
 import           Control.Monad       ( (<$!>) )
 import           Data.FingerTree     ( ViewL(..), (|>), (<|), (><) )
 import qualified Data.FingerTree     as F
@@ -35,9 +33,9 @@ data FileType
 
 -- Each Piece points to a span in the original or add file.
 data Piece = Piece
-    { _fileType :: FileType    -- Which file the Piece refers to.
-    , _start    :: Int         -- Offset into the the file.
-    , _len      :: Int         -- The length of the piece.
+    { _fileType :: !FileType              -- Which file the Piece refers to.
+    , _start    :: {-# UNPACK #-} !Int    -- Offset into the the file.
+    , _len      :: {-# UNPACK #-} !Int    -- The length of the piece.
     }
 
 makeLenses ''Piece
@@ -67,9 +65,9 @@ type AddFile = T.Text
 
 -- The PieceTable.
 data PieceTable = PieceTable
-    { _table    :: Table       -- Sequence of the Piece.
-    , _origFile :: OrigFile    -- Original file (read only).
-    , _addFile  :: AddFile     -- Add file (append only).
+    { _table    :: !Table       -- Sequence of the Piece.
+    , _origFile :: !OrigFile    -- Original file (read only).
+    , _addFile  :: !AddFile     -- Add file (append only).
     }
 
 makeLenses ''PieceTable
@@ -130,12 +128,12 @@ toSubstring p = T.take (p ^. len) . T.drop (p ^. start)
 
 -- Convert PieceTable to String.
 toString :: PieceTable -> String
-toString pt = views table (T.unpack . foldMap mkSubString) pt
+toString pt = views table (T.unpack . foldMap mkSubstring) pt
   where
-    mkSubString :: Piece -> T.Text
-    mkSubString p = case p ^. fileType of
-        Orig -> views origFile (toSubstring p) pt
-        Add  -> views addFile  (toSubstring p) pt
+    mkSubstring :: Piece -> T.Text
+    mkSubstring p = case p ^. fileType of
+        Orig -> toSubstring p (pt ^. origFile)
+        Add  -> toSubstring p (pt ^. addFile)
 
 -------------------------------------------------------------------------------
 
@@ -147,21 +145,18 @@ splitPiece at piece =
     )
 
 -- Split Table at the specified position.
--- TODO : fix ugly code.
 splitTable :: Int -> Table -> (Table, Table)
 splitTable at table
     | diff == 0 = ps
     | F.null rs = ps
-    | p F.:< rs' <- F.viewl rs = if diff > _len p
-        then (ls F.|> p, rs')
-        else let (lp, rp) = splitPiece diff p in  (ls F.|> lp, rp F.<| rs')
+    | p :< rs' <- F.viewl rs =
+        let (l, r) = splitPiece diff p in (ls |> l, r <| rs')
   where
     ps@(ls, rs) = F.split (Sum at <) table
     diff        = at - getSum (F.measure ls)
 
--- TODO : better name
-fill :: Table -> (Table, Table) -> Table
-fill m (l, r) = l >< m >< r
+interpose :: Table -> (Table, Table) -> Table
+interpose m (l, r) = l >< m >< r
 
 leftOf, rightOf :: Int -> Table -> Table
 leftOf  i = fst . splitTable i
@@ -178,7 +173,7 @@ slice from to = leftOf (to - from) . rightOf from
 insert :: Int -> T.Text -> PieceTable -> PieceTable
 insert at txt tbl
     = tbl
-    & table %~ fill t . splitTable at
+    & table %~ interpose t . splitTable at
     & addFile <>~ txt
   where
     t = F.singleton Piece
@@ -201,7 +196,7 @@ copy from to = views table (slice from to)
 
 -- Paste the Pieces to PieceTable.
 paste :: Int -> Table -> PieceTable -> PieceTable
-paste at t = table %~ fill t . splitTable at
+paste at m = table %~ interpose m . splitTable at
 
 -- cut from to = copy from to &&& delete from to
 cut :: Int -> Int -> PieceTable -> (Table, PieceTable)
