@@ -23,7 +23,7 @@ dependencies:
 - base >= 4.7 && < 5
 - fingertree
 - text
-- lens
+- bytestring
 
 library:
   source-dirs: src
