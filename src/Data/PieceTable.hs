@@ -6,7 +6,7 @@
 -- Module   : Data.PieceTable
 -- Author   : wasabi (https://github.com/wasabi315)
 --
--- Simple Piece Table implementation in Haskell.
+-- Piece Table implementation in Haskell.
 --
 -------------------------------------------------------------------------------
 
@@ -19,6 +19,7 @@ import           Data.FingerTree       ( ViewL(..), (|>), (<|), (><) )
 import qualified Data.FingerTree       as F
 import           Data.Foldable         ( toList )
 import           Data.Monoid           ( Sum(..) )
+import           Data.String
 import qualified Data.Text             as T
 import qualified Data.Text.Encoding    as TE
 import qualified Data.Text.IO          as TIO
@@ -38,15 +39,7 @@ data Piece = Piece
     , start    :: {-# UNPACK #-} !Int    -- Offset into the the file.
     , len      :: {-# UNPACK #-} !Int    -- The length of the piece.
     }
-
--- Show instance for Piece.
--- Render the Piece for debugging.
-instance Show Piece where
-    show Piece {..} = unwords
-        [ show fileType
-        , show start
-        , show len
-        ]
+  deriving Show
 
 -- Measured instance for Piece.
 -- Each Piece is measured by its length.
@@ -69,23 +62,11 @@ data PieceTable = PieceTable
     , addFile  :: !AddFile     -- Add file (append only).
     }
 
--- Show instance for PieceTable.
--- Render the PieceTable for debugging.
 instance Show PieceTable where
-    show p@PieceTable {..} = unlines $
-        [ "Text sequence :"
-        , indentEach $ T.unpack (toText p)
-        , "Original file :"
-        , indentEach $ T.unpack origFile
-        , "Add file :"
-        , indentEach $ T.unpack addFile
-        , "PieceTable:"
-        , "  fileType start len"
-        ] ++
-        map (indent . show) (toList table)
-      where
-        indent = ("    " ++)
-        indentEach = unlines . map indent . lines
+    show = show . toText
+
+instance IsString PieceTable where
+    fromString = fromText . T.pack
 
 -------------------------------------------------------------------------------
 -- Constructions and Deconstruction
@@ -111,14 +92,6 @@ fromText txt = empty
         , len      = T.length txt
         }
 
--- See fromText.
-fromString :: String -> PieceTable
-fromString = fromText . T.pack
-
--- Read a file and return contents as PieceTable.
-fromFile :: FilePath -> IO PieceTable
-fromFile path = fromText <$!> TIO.readFile path
-
 -- Yield the substring of the file that the piece refers to.
 toSubstring :: Piece -> T.Text -> T.Text
 toSubstring p = T.take (len p) . T.drop (start p)
@@ -131,6 +104,9 @@ toText pt = foldMap mkSubstring (table pt)
     mkSubstring p = case fileType p of
         Orig -> toSubstring p (origFile pt)
         Add  -> toSubstring p (addFile pt)
+
+toString :: PieceTable -> String
+toString = T.unpack . toText
 
 readFileWith :: FilePath -> (BS.ByteString -> T.Text) -> IO PieceTable
 readFileWith path decoder = fromText . decoder <$> BS.readFile path
@@ -149,14 +125,13 @@ splitPiece at p@Piece {..} =
 
 -- Split Table at the specified position.
 splitTable :: Int -> Table -> (Table, Table)
-splitTable at table
-    | diff == 0 = ps
-    | F.null rs = ps
-    | p :< rs' <- F.viewl rs =
-        let (l, r) = splitPiece diff p in (ls |> l, r <| rs')
-  where
-    ps@(ls, rs) = F.split (Sum at <) table
-    diff        = at - getSum (F.measure ls)
+splitTable at tbl = case F.search (\l _ -> Sum at < l) tbl of
+    F.Position l m r ->
+        let d = at - getSum (F.measure l)
+        in  (l |>) *** (<| r) $ splitPiece d m
+    F.OnLeft  -> (F.empty, tbl)
+    F.OnRight -> (tbl, F.empty)
+    F.Nowhere -> (tbl, F.empty)
 
 interpose :: Table -> (Table, Table) -> Table
 interpose m (l, r) = l >< m >< r
@@ -209,4 +184,24 @@ cut from to pt@PieceTable {..} = ( m, pt { table = l >< r } )
   where
     (l, mr) = splitTable from table
     (m, r)  = splitTable (to - from) mr
+
+-------------------------------------------------------------------------------
+-- Debugging
+
+-- Show the PieceTable for debugging.
+showPieceTable :: PieceTable -> String
+showPieceTable p@PieceTable {..} = unlines $
+    [ "Text sequence :"
+    , indentEach $ T.unpack (toText p)
+    , "Original file :"
+    , indentEach $ T.unpack origFile
+    , "Add file :"
+    , indentEach $ T.unpack addFile
+    , "PieceTable:"
+    , "    fileType start len"
+    ] ++
+    map (indent . show) (toList table)
+  where
+    indent = ("    " ++)
+    indentEach = unlines . map indent . lines
 

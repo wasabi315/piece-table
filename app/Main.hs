@@ -3,12 +3,14 @@ module Main where
 
 import           Data.List        ( intersperse )
 import           Data.Function    ( (&) )
+import           Data.String
+
 import           Data.PieceTable
 
 main :: IO ()
 main = mapM_ putStrLn
     $ intersperse "--------------------"
-    $ map show
+    $ map showPieceTable
     $ scanl (&) pt operations
   where
     pt = fromString "Hello, world!"
