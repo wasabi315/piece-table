@@ -8,12 +8,7 @@ import           Data.String
 import           Data.PieceTable
 
 main :: IO ()
-main = mapM_ putStrLn
-    $ intersperse "--------------------"
-    $ map showPieceTable
-    $ scanl (&) pt operations
-  where
-    pt = fromString "Hello, world!"
+main = mapM_ printPieceTable $ scanl (&) "Hello, world!" operations
 
 operations :: [PieceTable -> PieceTable]
 operations =

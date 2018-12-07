@@ -18,7 +18,7 @@ import           Control.Lens          hiding ( (|>), (<|) )
 import qualified Data.ByteString       as BS
 import           Data.FingerTree       ( ViewL(..), (|>), (<|), (><) )
 import qualified Data.FingerTree       as F
-import           Data.Foldable         ( toList )
+import           Data.Foldable         ( fold, toList )
 import           Data.Monoid           ( Sum(..) )
 import           Data.String
 import qualified Data.Text             as T
@@ -87,12 +87,7 @@ fromText t = PieceTable (F.singleton p) t T.empty
 
 -- Convert PieceTable to Text.
 toText :: PieceTable -> T.Text
-toText pt = foldMap mkSubstring $ pt ^. table
-  where
-    mkSubstring :: Piece -> T.Text
-    mkSubstring (Piece t s l) = T.take l . T.drop s $ case t of
-        Orig -> pt ^. origFile
-        Add  -> pt ^. addFile
+toText = foldMap <$> (|!|) <*> view table
 
 toString :: PieceTable -> String
 toString = T.unpack . toText
@@ -104,12 +99,25 @@ readFile :: FilePath -> IO PieceTable
 readFile p = readFileWith p TE.decodeUtf8
 
 -------------------------------------------------------------------------------
+-- Opetators
+
+infixr 5 <?
+infixl 5 ?>
+infixl 9 |!|
 
 (?>) :: Table -> Piece -> Table
 t ?> p = if p ^. len == 0 then t else t |> p
 
 (<?) :: Piece -> Table -> Table
 p <? t = if p ^. len == 0 then t else p <| t
+
+-- Get the substring that the piece represents.
+(|!|) :: PieceTable -> Piece -> T.Text
+pt |!| Piece t s l = T.take l . T.drop s $ case t of
+    Orig -> pt ^. origFile
+    Add  -> pt ^. addFile
+
+-------------------------------------------------------------------------------
 
 -- Split Piece at the specified position.
 splitPiece :: Int -> Piece -> (Piece, Piece)
@@ -158,19 +166,18 @@ delete i j pt
 -------------------------------------------------------------------------------
 -- Debugging
 
--- Show the PieceTable for debugging.
-showPieceTable :: PieceTable -> String
-showPieceTable pt = unlines $
-    [ "Text sequence :"
-    , indentEach $ T.unpack (toText pt)
-    , "Original file :"
-    , indentEach $ T.unpack (pt ^. origFile)
-    , "Add file :"
-    , indentEach $ T.unpack (pt ^. addFile)
-    , "PieceTable:"
-    ] ++
-    map (indent . show) (toList (pt ^. table))
+printPieceTable :: PieceTable -> IO ()
+printPieceTable pt = do
+    putStrLn "----------------------------------------\n"
+    putStrLn "Text sequence :"
+    mapM_ (putStrLn . indent) . lines . T.unpack . toText $ pt
+    putStrLn "Original file :"
+    mapM_ (putStrLn . indent) . lines . T.unpack . view origFile $ pt
+    putStrLn "Add file :"
+    mapM_ (putStrLn . indent) . lines . T.unpack . view addFile $ pt
+    putStrLn "Table:"
+    mapM_ (putStrLn . indent . show) . toList . view table $ pt
+    putStrLn "\n----------------------------------------"
   where
     indent = ("    " ++)
-    indentEach = unlines . map indent . lines
 
