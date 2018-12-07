@@ -39,7 +39,9 @@ data Piece = Piece
     , _start    :: {-# UNPACK #-} Int    -- Offset into the the file.
     , _len      :: {-# UNPACK #-} Int    -- The length of the piece.
     }
-  deriving Show
+
+instance Show Piece where
+    show (Piece f s l) = unwords [ show f, show s, show l ]
 
 makeLenses ''Piece
 
@@ -170,15 +172,15 @@ delete i j pt
 printPieceTable :: PieceTable -> IO ()
 printPieceTable pt = do
     putStrLn "----------------------------------------\n"
-    putStrLn "Text sequence :"
-    mapM_ (putStrLn . indent) . lines . T.unpack . toText $ pt
-    putStrLn "Original file :"
-    mapM_ (putStrLn . indent) . lines . T.unpack . view origFile $ pt
-    putStrLn "Add file :"
-    mapM_ (putStrLn . indent) . lines . T.unpack . view addFile $ pt
+    putStrLn "Text sequence:"
+    printEach . lines . T.unpack . toText $ pt
+    putStrLn "Original file:"
+    printEach . lines . T.unpack . view origFile $ pt
+    putStrLn "Add file:"
+    printEach . lines . T.unpack . view addFile $ pt
     putStrLn "Table:"
-    mapM_ (putStrLn . indent . show) . toList . view table $ pt
+    printEach . map show . toList . view table $ pt
     putStrLn "\n----------------------------------------"
   where
-    indent = ("    " ++)
+    printEach = mapM_ (putStrLn . ("    "  ++))
 
