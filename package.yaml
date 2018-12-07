@@ -24,6 +24,7 @@ dependencies:
 - fingertree
 - text
 - bytestring
+- lens
 
 library:
   source-dirs: src
