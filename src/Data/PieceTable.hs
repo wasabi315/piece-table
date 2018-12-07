@@ -166,6 +166,7 @@ delete i j pt
 -------------------------------------------------------------------------------
 -- Debugging
 
+-- Print PieceTable for debugging.
 printPieceTable :: PieceTable -> IO ()
 printPieceTable pt = do
     putStrLn "----------------------------------------\n"
