@@ -3,7 +3,6 @@ module Main where
 
 import           Data.List        ( intersperse )
 import           Data.Function    ( (&) )
-import           Data.String
 
 import           Data.PieceTable
 
