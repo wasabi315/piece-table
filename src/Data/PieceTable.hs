@@ -16,9 +16,9 @@ module Data.PieceTable where
 import           Control.Arrow
 import           Control.Lens          hiding ( (|>), (<|) )
 import qualified Data.ByteString       as BS
-import           Data.FingerTree       ( ViewL(..), (|>), (<|), (><) )
+import           Data.FingerTree       ( (|>), (<|), (><) )
 import qualified Data.FingerTree       as F
-import           Data.Foldable         ( fold, toList )
+import           Data.Foldable         ( toList )
 import           Data.Monoid           ( Sum(..) )
 import           Data.String
 import qualified Data.Text             as T
@@ -40,10 +40,10 @@ data Piece = Piece
     , _len      :: {-# UNPACK #-} Int    -- The length of the piece.
     }
 
+makeLenses ''Piece
+
 instance Show Piece where
     show (Piece f s l) = unwords [ show f, show s, show l ]
-
-makeLenses ''Piece
 
 -- Measured instance for Piece.
 -- Each Piece is measured by its length.
@@ -149,10 +149,10 @@ rightOf i = snd . splitTable i
 insert :: Int -> T.Text -> PieceTable -> PieceTable
 insert i t pt
     = pt
-    & table %~ interpose p . splitTable i
+    & table %~ interpose (F.singleton p) . splitTable i
     & addFile <>~ t
   where
-     p = F.singleton Piece
+     p = Piece
          { _fileType = Add
          , _start    = T.length (pt ^. addFile)
          , _len      = T.length t
