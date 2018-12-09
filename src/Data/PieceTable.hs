@@ -13,6 +13,7 @@
 
 module Data.PieceTable where
 
+import           Prelude               hiding ( drop, splitAt, take )
 import           Control.Arrow
 import           Control.Lens          hiding ( (|>), (<|) )
 import qualified Data.ByteString       as BS
@@ -126,8 +127,8 @@ splitPiece :: Int -> Piece -> (Piece, Piece)
 splitPiece i (Piece f s l) = ( Piece f s i, Piece f (s + i) (l - i) )
 
 -- Split Table at the specified position.
-splitTable :: Int -> Table -> (Table, Table)
-splitTable i t = case F.search (const . (Sum i <)) t of
+splitAt :: Int -> Table -> (Table, Table)
+splitAt i t = case F.search (const . (Sum i <)) t of
     F.Position l m r ->
         let d = i - getSum (F.measure l)
         in  (l ?>) *** (<? r) $ splitPiece d m
@@ -135,9 +136,9 @@ splitTable i t = case F.search (const . (Sum i <)) t of
     F.OnRight -> (t, F.empty)
     F.Nowhere -> (t, F.empty)
 
-leftOf, rightOf :: Int -> Table -> Table
-leftOf  i = fst . splitTable i
-rightOf i = snd . splitTable i
+take, drop :: Int -> Table -> Table
+take i = fst . splitAt i
+drop i = snd . splitAt i
 
 -------------------------------------------------------------------------------
 -- Editting Operations
@@ -146,7 +147,7 @@ rightOf i = snd . splitTable i
 insert :: Int -> T.Text -> PieceTable -> PieceTable
 insert i t pt
     = pt
-    & table %~ uncurry (><) . fmap (p <?) . splitTable i
+    & table %~ uncurry (><) . fmap (p <?) . splitAt i
     & addFile <>~ t
   where
      p = Piece
@@ -158,7 +159,7 @@ insert i t pt
 -- Delete String of the specified range from PieceTable.
 delete :: Int -> Int -> PieceTable -> PieceTable
 delete i j pt
-    | i < j     = pt & table %~ ((><) <$> leftOf i <*> rightOf j)
+    | i < j     = pt & table %~ ((><) <$> take i <*> drop j)
     | i == j    = pt
     | otherwise = delete j i pt
 
