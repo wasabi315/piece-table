@@ -135,9 +135,6 @@ splitTable i t = case F.search (const . (Sum i <)) t of
     F.OnRight -> (t, F.empty)
     F.Nowhere -> (t, F.empty)
 
-interpose :: Table -> (Table, Table) -> Table
-interpose m (l, r) = l >< m >< r
-
 leftOf, rightOf :: Int -> Table -> Table
 leftOf  i = fst . splitTable i
 rightOf i = snd . splitTable i
@@ -149,7 +146,7 @@ rightOf i = snd . splitTable i
 insert :: Int -> T.Text -> PieceTable -> PieceTable
 insert i t pt
     = pt
-    & table %~ interpose (F.singleton p) . splitTable i
+    & table %~ uncurry (><) . fmap (p <?) . splitTable i
     & addFile <>~ t
   where
      p = Piece
