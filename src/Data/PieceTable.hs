@@ -13,7 +13,6 @@
 
 module Data.PieceTable where
 
-import           Prelude               hiding ( drop, splitAt, take )
 import           Control.Arrow
 import           Control.Lens          hiding ( (|>), (<|) )
 import qualified Data.ByteString       as BS
@@ -49,7 +48,7 @@ instance Show Piece where
 -- Measured instance for Piece.
 -- Each Piece is measured by its length.
 instance F.Measured (Sum Int) Piece where
-    measure = Sum . _len
+    measure = Sum . view len
 
 -- Type synonym for the FingerTree of the Piece.
 type Table = F.FingerTree (Sum Int) Piece
@@ -90,7 +89,7 @@ fromText t = PieceTable (F.singleton p) t T.empty
 
 -- Convert PieceTable to Text.
 toText :: PieceTable -> T.Text
-toText = foldMap <$> (|!|) <*> view table
+toText = foldMap <$> (<!>) <*> view table
 
 toString :: PieceTable -> String
 toString = T.unpack . toText
@@ -106,7 +105,7 @@ readFile p = readFileWith p TE.decodeUtf8
 
 infixr 5 <?
 infixl 5 ?>
-infixl 9 |!|
+infixl 9 <!>
 
 (?>) :: Table -> Piece -> Table
 t ?> p = if p ^. len == 0 then t else t |> p
@@ -115,8 +114,8 @@ t ?> p = if p ^. len == 0 then t else t |> p
 p <? t = if p ^. len == 0 then t else p <| t
 
 -- Get the substring that the piece represents.
-(|!|) :: PieceTable -> Piece -> T.Text
-pt |!| Piece t s l = T.take l . T.drop s $ case t of
+(<!>) :: PieceTable -> Piece -> T.Text
+pt <!> Piece t s l = T.take l . T.drop s $ case t of
     Orig -> pt ^. origFile
     Add  -> pt ^. addFile
 
@@ -127,8 +126,8 @@ splitPiece :: Int -> Piece -> (Piece, Piece)
 splitPiece i (Piece f s l) = ( Piece f s i, Piece f (s + i) (l - i) )
 
 -- Split Table at the specified position.
-splitAt :: Int -> Table -> (Table, Table)
-splitAt i t = case F.search (const . (Sum i <)) t of
+splitTable :: Int -> Table -> (Table, Table)
+splitTable i t = case F.search (const . (Sum i <)) t of
     F.Position l m r ->
         let d = i - getSum (F.measure l)
         in  (l ?>) *** (<? r) $ splitPiece d m
@@ -136,9 +135,9 @@ splitAt i t = case F.search (const . (Sum i <)) t of
     F.OnRight -> (t, F.empty)
     F.Nowhere -> (t, F.empty)
 
-take, drop :: Int -> Table -> Table
-take i = fst . splitAt i
-drop i = snd . splitAt i
+leftOf, rightOf :: Int -> Table -> Table
+leftOf  i = fst . splitTable i
+rightOf i = snd . splitTable i
 
 -------------------------------------------------------------------------------
 -- Editting Operations
@@ -147,19 +146,15 @@ drop i = snd . splitAt i
 insert :: Int -> T.Text -> PieceTable -> PieceTable
 insert i t pt
     = pt
-    & table %~ uncurry (><) . fmap (p <?) . splitAt i
+    & table %~ uncurry (><) . fmap (p <?) . splitTable i
     & addFile <>~ t
   where
-     p = Piece
-         { _fileType = Add
-         , _start    = T.length (pt ^. addFile)
-         , _len      = T.length t
-         }
+    p = Piece Add (views addFile T.length pt) (T.length t)
 
 -- Delete String of the specified range from PieceTable.
 delete :: Int -> Int -> PieceTable -> PieceTable
 delete i j pt
-    | i < j     = pt & table %~ ((><) <$> take i <*> drop j)
+    | i < j     = pt & table %~ ((><) <$> leftOf i <*> rightOf j)
     | i == j    = pt
     | otherwise = delete j i pt
 
