@@ -140,15 +140,15 @@ leftOf, rightOf :: Int64 -> Table -> Table
 leftOf  i = fst . splitTable i
 rightOf i = snd . splitTable i
 
-isOutOfIndex :: Int64 -> Table -> Bool
-isOutOfIndex i t = i < 0 || F.measure t < Sum i
+isOutOfRange :: Int64 -> Table -> Bool
+isOutOfRange i t = i < 0 || F.measure t < Sum i
 
 -------------------------------------------------------------------------------
 -- Editting Operations
 
 -- Insert Text at the specified position in the given PieceTable.
 insert :: Int64 -> TL.Text -> PieceTable -> PieceTable
-insert i t pt = if isOutOfIndex i (pt ^. table)
+insert i t pt = if isOutOfRange i (pt ^. table)
     then pt
     else insert' i t pt
 
@@ -162,10 +162,10 @@ insert' i t pt
 
 -- Delete String of the specified range from PieceTable.
 delete :: Int64 -> Int64 -> PieceTable -> PieceTable
-delete i j pt
-    | i < j     = pt & table %~ ((><) <$> leftOf i <*> rightOf j)
-    | i == j    = pt
-    | otherwise = delete j i pt
+delete i j pt = case compare i j of
+    LT -> pt & table %~ ((><) <$> leftOf i <*> rightOf j)
+    EQ -> pt
+    GT -> delete j i pt
 
 -------------------------------------------------------------------------------
 -- Debugging
