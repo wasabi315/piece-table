@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE StrictData            #-}
 {-# LANGUAGE TemplateHaskell       #-}
 -------------------------------------------------------------------------------
@@ -14,15 +15,17 @@
 module Data.PieceTable where
 
 import           Control.Arrow
-import           Control.Lens          hiding ( (|>), (<|) )
-import qualified Data.ByteString       as BS
-import           Data.FingerTree       ( (|>), (<|), (><) )
-import qualified Data.FingerTree       as F
-import           Data.Foldable         ( toList )
-import           Data.Monoid           ( Sum(..) )
+import           Control.Lens               hiding ( (|>), (<|) )
+import qualified Data.ByteString.Lazy       as BL
+import           Data.FingerTree            ( (|>), (<|), (><) )
+import qualified Data.FingerTree            as F
+import           Data.Foldable              ( toList )
+import           Data.Int                   ( Int64 )
+import           Data.Monoid                ( Sum(..) )
 import           Data.String
-import qualified Data.Text             as T
-import qualified Data.Text.Encoding    as TE
+import qualified Data.Text.Lazy             as TL
+import qualified Data.Text.Lazy.Encoding    as TLE
+import qualified Data.Text.Lazy.IO          as TLIO
 
 -------------------------------------------------------------------------------
 -- Types and Instances
@@ -35,9 +38,9 @@ data FileType
 
 -- Each Piece points to a span in the original or add file.
 data Piece = Piece
-    { _fileType :: FileType              -- Which file the Piece refers to.
-    , _start    :: {-# UNPACK #-} Int    -- Offset into the the file.
-    , _len      :: {-# UNPACK #-} Int    -- The length of the piece.
+    { _fileType :: FileType                -- Which file the Piece refers to.
+    , _start    :: {-# UNPACK #-} Int64    -- Offset into the the file.
+    , _len      :: {-# UNPACK #-} Int64    -- The length of the piece.
     }
 
 makeLenses ''Piece
@@ -47,17 +50,15 @@ instance Show Piece where
 
 -- Measured instance for Piece.
 -- Each Piece is measured by its length.
-instance F.Measured (Sum Int) Piece where
-    measure = Sum . view len
+instance F.Measured (Sum Int64) Piece where
+    measure = views len Sum
 
 -- Type synonym for the FingerTree of the Piece.
-type Table = F.FingerTree (Sum Int) Piece
+type Table = F.FingerTree (Sum Int64) Piece
 
 -- Type synonym for the Text.
-type OrigFile = T.Text
-
--- Type synonym for the Text.
-type AddFile = T.Text
+type OrigFile = TL.Text
+type AddFile  = TL.Text
 
 -- The PieceTable.
 data PieceTable = PieceTable
@@ -69,36 +70,36 @@ data PieceTable = PieceTable
 makeLenses ''PieceTable
 
 instance Show PieceTable where
-    show = T.unpack . toText
+    show = TL.unpack . toText
 
 instance IsString PieceTable where
-    fromString = fromText . T.pack
+    fromString = fromText . TL.pack
 
 -------------------------------------------------------------------------------
 -- Constructions and Deconstruction
 
 -- Empty PieceTable.
 empty :: PieceTable
-empty = PieceTable F.empty T.empty T.empty
+empty = PieceTable F.empty TL.empty TL.empty
 
 -- Create PieceTable from Text.
-fromText :: T.Text -> PieceTable
-fromText t = PieceTable (F.singleton p) t T.empty
+fromText :: TL.Text -> PieceTable
+fromText t = PieceTable (F.singleton p) t TL.empty
   where
-    p = Piece Orig 0 (T.length t)
+    p = Piece Orig 0 (TL.length t)
 
 -- Convert PieceTable to Text.
-toText :: PieceTable -> T.Text
+toText :: PieceTable -> TL.Text
 toText = foldMap <$> (<!>) <*> view table
 
 toString :: PieceTable -> String
-toString = T.unpack . toText
+toString = TL.unpack . toText
 
-readFileWith :: FilePath -> (BS.ByteString -> T.Text) -> IO PieceTable
-readFileWith p dec = fromText . dec <$> BS.readFile p
+readFileWith :: FilePath -> (BL.ByteString -> TL.Text) -> IO PieceTable
+readFileWith p dec = fromText . dec <$> BL.readFile p
 
 readFile :: FilePath -> IO PieceTable
-readFile p = readFileWith p TE.decodeUtf8
+readFile p = readFileWith p TLE.decodeUtf8
 
 -------------------------------------------------------------------------------
 -- Opetators
@@ -114,19 +115,19 @@ t ?> p = if p ^. len == 0 then t else t |> p
 p <? t = if p ^. len == 0 then t else p <| t
 
 -- Get the substring that the piece represents.
-(<!>) :: PieceTable -> Piece -> T.Text
-pt <!> Piece t s l = T.take l . T.drop s $ case t of
+(<!>) :: PieceTable -> Piece -> TL.Text
+pt <!> Piece t s l = TL.take l . TL.drop s $ case t of
     Orig -> pt ^. origFile
     Add  -> pt ^. addFile
 
 -------------------------------------------------------------------------------
 
 -- Split Piece at the specified position.
-splitPiece :: Int -> Piece -> (Piece, Piece)
+splitPiece :: Int64 -> Piece -> (Piece, Piece)
 splitPiece i (Piece f s l) = ( Piece f s i, Piece f (s + i) (l - i) )
 
 -- Split Table at the specified position.
-splitTable :: Int -> Table -> (Table, Table)
+splitTable :: Int64 -> Table -> (Table, Table)
 splitTable i t = case F.search (const . (Sum i <)) t of
     F.Position l m r ->
         let d = i - getSum (F.measure l)
@@ -135,24 +136,32 @@ splitTable i t = case F.search (const . (Sum i <)) t of
     F.OnRight -> (t, F.empty)
     F.Nowhere -> (t, F.empty)
 
-leftOf, rightOf :: Int -> Table -> Table
+leftOf, rightOf :: Int64 -> Table -> Table
 leftOf  i = fst . splitTable i
 rightOf i = snd . splitTable i
+
+isOutOfIndex :: Int64 -> Table -> Bool
+isOutOfIndex i t = i < 0 || F.measure t < Sum i
 
 -------------------------------------------------------------------------------
 -- Editting Operations
 
 -- Insert Text at the specified position in the given PieceTable.
-insert :: Int -> T.Text -> PieceTable -> PieceTable
-insert i t pt
+insert :: Int64 -> TL.Text -> PieceTable -> PieceTable
+insert i t pt = if isOutOfIndex i (pt ^. table)
+    then pt
+    else insert' i t pt
+
+insert' :: Int64 -> TL.Text -> PieceTable -> PieceTable
+insert' i t pt
     = pt
     & table %~ uncurry (><) . fmap (p <?) . splitTable i
     & addFile <>~ t
   where
-    p = Piece Add (views addFile T.length pt) (T.length t)
+    p = Piece Add (views addFile TL.length pt) (TL.length t)
 
 -- Delete String of the specified range from PieceTable.
-delete :: Int -> Int -> PieceTable -> PieceTable
+delete :: Int64 -> Int64 -> PieceTable -> PieceTable
 delete i j pt
     | i < j     = pt & table %~ ((><) <$> leftOf i <*> rightOf j)
     | i == j    = pt
@@ -162,18 +171,19 @@ delete i j pt
 -- Debugging
 
 -- Print PieceTable for debugging.
-printPieceTable :: PieceTable -> IO ()
-printPieceTable pt = do
+printPT :: PieceTable -> IO ()
+printPT pt = do
     putStrLn "----------------------------------------\n"
     putStrLn "Text sequence:"
-    printEach . lines . T.unpack . toText $ pt
+    printTs . toText $ pt
     putStrLn "Original file:"
-    printEach . lines . T.unpack . view origFile $ pt
+    printTs . view origFile $ pt
     putStrLn "Add file:"
-    printEach . lines . T.unpack . view addFile $ pt
+    printTs . view addFile $ pt
     putStrLn "Table:"
-    printEach . map show . toList . view table $ pt
+    mapM_ (putStrLn . ("    " ++) . show)  . toList . view table $ pt
     putStrLn "\n----------------------------------------"
   where
-    printEach = mapM_ (putStrLn . ("    "  ++))
+    printTs :: TL.Text -> IO ()
+    printTs = mapM_ (TLIO.putStrLn . ("    " <>)) . TL.lines
 

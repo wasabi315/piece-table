@@ -7,13 +7,13 @@ import           Data.Function    ( (&) )
 import           Data.PieceTable
 
 main :: IO ()
-main = mapM_ printPieceTable $ scanl (&) "Hello, world!" operations
+main = mapM_ printPT $ scanl (&) "Hello, world!" operations
 
 operations :: [PieceTable -> PieceTable]
 operations =
     [ insert 7 "silent "
     , delete 0 5
     , insert 0 "Good night"
-    , delete 24 26
+    , delete 26 24
     , insert 100 "..."
     ]
