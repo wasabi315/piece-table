@@ -165,7 +165,7 @@ delete :: Int64 -> Int64 -> PieceTable -> PieceTable
 delete i j pt = case compare i j of
     LT -> pt & table %~ ((><) <$> leftOf i <*> rightOf j)
     EQ -> pt
-    GT -> delete j i pt
+    GT -> pt & table %~ ((><) <$> leftOf j <*> rightOf i)
 
 -------------------------------------------------------------------------------
 -- Debugging
