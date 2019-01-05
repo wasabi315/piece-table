@@ -1,6 +1,8 @@
 {-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE StrictData            #-}
 {-# LANGUAGE TemplateHaskell       #-}
 -------------------------------------------------------------------------------
@@ -15,17 +17,19 @@
 module Data.PieceTable where
 
 import           Control.Arrow
-import           Control.Lens               hiding ( (|>), (<|) )
-import qualified Data.ByteString.Lazy       as BL
-import           Data.FingerTree            ( (|>), (<|), (><) )
-import qualified Data.FingerTree            as F
-import           Data.Foldable              ( toList )
-import           Data.Int                   ( Int64 )
-import           Data.Monoid                ( Sum(..) )
+import           Control.Exception           ( try )
+import           Control.Lens                hiding ( (|>), (<|) )
+import qualified Data.ByteString.Lazy        as BL
+import           Data.FingerTree             ( (|>), (<|), (><) )
+import qualified Data.FingerTree             as F
+import           Data.Foldable               ( toList )
+import           Data.Int                    ( Int64 )
+import           Data.Monoid                 ( Sum(..) )
 import           Data.String
-import qualified Data.Text.Lazy             as TL
-import qualified Data.Text.Lazy.Encoding    as TLE
-import qualified Data.Text.Lazy.IO          as TLIO
+import           Data.Text.Encoding.Error    as TEE
+import qualified Data.Text.Lazy              as TL
+import qualified Data.Text.Lazy.Encoding     as TLE
+import qualified Data.Text.Lazy.IO           as TLIO
 
 -------------------------------------------------------------------------------
 -- Types and Instances
@@ -95,11 +99,21 @@ toText = foldMap <$> (<!>) <*> view table
 toString :: PieceTable -> String
 toString = TL.unpack . toText
 
-readFileWith :: FilePath -> (BL.ByteString -> TL.Text) -> IO PieceTable
-readFileWith p dec = fromText . dec <$> BL.readFile p
-
-readFile :: FilePath -> IO PieceTable
-readFile p = readFileWith p TLE.decodeUtf8
+readFile :: FilePath -> IO (Either String PieceTable)
+readFile p = BL.readFile p >>= go decs
+  where
+    go []     _ = pure (Left err)
+    go (d:ds) b = try (pure (d b)) >>= \case
+        Left  (_ :: TEE.UnicodeException) -> go ds b
+        Right t -> pure (Right (fromText t))
+    err = "Could not guess the encoding of " ++ p
+    decs =
+        [ TLE.decodeUtf8
+        , TLE.decodeUtf16LE
+        , TLE.decodeUtf16BE
+        , TLE.decodeUtf32LE
+        , TLE.decodeUtf32BE
+        ]
 
 -------------------------------------------------------------------------------
 -- Opetators
