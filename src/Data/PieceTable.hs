@@ -167,12 +167,10 @@ insert i t pt = if isOutOfRange i (pt ^. table)
     else insert' i t pt
 
 insert' :: Int64 -> TL.Text -> PieceTable -> PieceTable
-insert' i t pt
-    = pt
-    & table %~ uncurry (><) . fmap (p <?) . splitTable i
-    & addFile <>~ t
-  where
-    p = Piece Add (views addFile TL.length pt) (TL.length t)
+insert' i t pt = pt &~ do
+    let p = Piece Add (views addFile TL.length pt) (TL.length t)
+    table %= uncurry (><) . fmap (p <?) . splitTable i
+    addFile <>= t
 
 -- Delete String of the specified range from PieceTable.
 delete :: Int64 -> Int64 -> PieceTable -> PieceTable
