@@ -162,12 +162,7 @@ isOutOfRange i t = i < 0 || F.measure t < Sum i
 
 -- Insert Text at the specified position in the given PieceTable.
 insert :: Int64 -> TL.Text -> PieceTable -> PieceTable
-insert i t pt = if isOutOfRange i (pt ^. table)
-    then pt
-    else insert' i t pt
-
-insert' :: Int64 -> TL.Text -> PieceTable -> PieceTable
-insert' i t pt = pt &~ do
+insert i t pt = pt &~ do
     let p = Piece Add (views addFile TL.length pt) (TL.length t)
     table %= uncurry (><) . fmap (p <?) . splitTable i
     addFile <>= t
@@ -177,7 +172,7 @@ delete :: Int64 -> Int64 -> PieceTable -> PieceTable
 delete i j pt = case compare i j of
     LT -> pt & table %~ ((><) <$> leftOf i <*> rightOf j)
     EQ -> pt
-    GT -> pt & table %~ ((><) <$> leftOf j <*> rightOf i)
+    GT -> delete j i pt
 
 -------------------------------------------------------------------------------
 -- Debugging
