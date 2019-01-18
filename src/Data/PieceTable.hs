@@ -154,9 +154,6 @@ leftOf, rightOf :: Int64 -> Table -> Table
 leftOf  i = fst . splitTable i
 rightOf i = snd . splitTable i
 
-isOutOfRange :: Int64 -> Table -> Bool
-isOutOfRange i t = i < 0 || F.measure t < Sum i
-
 -------------------------------------------------------------------------------
 -- Editting Operations
 
