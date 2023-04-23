@@ -1,8 +1,9 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ImportQualifiedPost #-}
 
 import Data.Int
-import qualified Data.Text.Lazy as TL
-import Data.Text.PieceTable
+import Data.Text.Lazy qualified as TL
+import Data.Text.PieceTable qualified as PT
 import Test.QuickCheck
 
 main :: IO ()
@@ -32,12 +33,12 @@ ins i s t
 
 propInsert :: Int64 -> TL.Text -> TL.Text -> Bool
 propInsert i t pt =
-  toText (insert i t (fromText pt))
+  PT.toText (PT.insert i t (PT.fromText pt))
     == ins i t pt
 
 propDelete :: Int64 -> Int64 -> TL.Text -> Bool
 propDelete i j pt =
-  toText (delete i j (fromText pt))
+  PT.toText (PT.delete i j (PT.fromText pt))
     == del i j pt
   where
     del n m t = case compare n m of
