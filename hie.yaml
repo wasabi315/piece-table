@@ -1,0 +1,13 @@
+cradle:
+  cabal:
+    - path: "src"
+      component: "lib:piece-table"
+
+    - path: "app/Main.hs"
+      component: "piece-table:exe:piece-table"
+
+    - path: "app/Paths_piece_table.hs"
+      component: "piece-table:exe:piece-table"
+
+    - path: "test"
+      component: "piece-table:test:piece-table-test"

@@ -1,3 +1,3 @@
-# Changelog for pieceTable
+# Changelog for piece-table
 
 ## Unreleased changes

@@ -1,54 +1,49 @@
-name:                pieceTable
-version:             0.1.0.0
-github:              "wasabi315/pieceTable"
-license:             BSD3
-author:              "Satoshi Takimoto"
-maintainer:          "wasabi.nvim.st@gmail.com"
-copyright:           "(c) 2018 Satoshi Takimoto"
+name: piece-table
+version: 0.1.0.0
+github: "wasabi315/piece-table"
+license: BSD3
+author: "Satoshi Takimoto"
+maintainer: "wasabi.nvim.st@gmail.com"
+copyright: "(c) 2023 Satoshi Takimoto"
 
 extra-source-files:
-- README.md
-- ChangeLog.md
+  - README.md
+  - ChangeLog.md
 
-# Metadata used when publishing your package
-# synopsis:            Short description of your package
-# category:            Web
+synopsis: PieceTable implementation in Haskell
+category: Text
 
-# To avoid duplicated efforts in documentation and dealing with the
-# complications of embedding Haddock markup inside cabal files, it is
-# common to point users to the README.md file.
-description:         Please see the README on GitHub at <https://github.com/wasabi315/pieceTable#readme>
+description: Please see the README on GitHub at <https://github.com/wasabi315/piece-table#readme>
 
 dependencies:
-- base >= 4.7 && < 5
-- fingertree
-- text
-- bytestring
-- lens
+  - base >= 4.7 && < 5
+  - fingertree
+  - text
+  - bytestring
+  - lens
+
+ghc-options:
+  - -Wall
+  - -Wcompat
+  - -Wincomplete-record-updates
+  - -Wincomplete-uni-patterns
+  - -Wredundant-constraints
+  - -O1
 
 library:
   source-dirs: src
 
 executables:
-  pieceTable:
-    main:                Main.hs
-    source-dirs:         app
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
+  piece-table:
+    main: Main.hs
+    source-dirs: app
     dependencies:
-    - pieceTable
+      - piece-table
 
 tests:
-  pieceTable-test:
-    main:                Spec.hs
-    source-dirs:         test
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
-    - -Wall
+  piece-table-test:
+    main: Spec.hs
+    source-dirs: test
     dependencies:
-    - pieceTable
-    - QuickCheck
+      - piece-table
+      - QuickCheck

@@ -1,0 +1,76 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.35.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           piece-table
+version:        0.1.0.0
+synopsis:       PieceTable implementation in Haskell
+description:    Please see the README on GitHub at <https://github.com/wasabi315/piece-table#readme>
+category:       Text
+homepage:       https://github.com/wasabi315/piece-table#readme
+bug-reports:    https://github.com/wasabi315/piece-table/issues
+author:         Satoshi Takimoto
+maintainer:     wasabi.nvim.st@gmail.com
+copyright:      (c) 2023 Satoshi Takimoto
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+    ChangeLog.md
+
+source-repository head
+  type: git
+  location: https://github.com/wasabi315/piece-table
+
+library
+  exposed-modules:
+      Data.Text.PieceTable
+  other-modules:
+      Paths_piece_table
+  hs-source-dirs:
+      src
+  ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -O1
+  build-depends:
+      base >=4.7 && <5
+    , bytestring
+    , fingertree
+    , lens
+    , text
+  default-language: Haskell2010
+
+executable piece-table
+  main-is: Main.hs
+  other-modules:
+      Paths_piece_table
+  hs-source-dirs:
+      app
+  ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -O1
+  build-depends:
+      base >=4.7 && <5
+    , bytestring
+    , fingertree
+    , lens
+    , piece-table
+    , text
+  default-language: Haskell2010
+
+test-suite piece-table-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Paths_piece_table
+  hs-source-dirs:
+      test
+  ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -O1
+  build-depends:
+      QuickCheck
+    , base >=4.7 && <5
+    , bytestring
+    , fingertree
+    , lens
+    , piece-table
+    , text
+  default-language: Haskell2010
