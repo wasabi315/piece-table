@@ -33,12 +33,12 @@ ins i s t
 
 propInsert :: Int64 -> TL.Text -> TL.Text -> Bool
 propInsert i t pt =
-  PT.toText (PT.insert i t (PT.fromText pt))
+  PT.toLazyText (PT.insert i t (PT.fromLazyText pt))
     == ins i t pt
 
 propDelete :: Int64 -> Int64 -> TL.Text -> Bool
 propDelete i j pt =
-  PT.toText (PT.delete i j (PT.fromText pt))
+  PT.toLazyText (PT.delete i j (PT.fromLazyText pt))
     == del i j pt
   where
     del n m t = case compare n m of

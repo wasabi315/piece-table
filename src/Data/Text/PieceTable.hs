@@ -12,8 +12,8 @@ module Data.Text.PieceTable
   ( PieceTable,
     empty,
     index,
-    fromText,
-    toText,
+    fromLazyText,
+    toLazyText,
     toString,
     length,
     insert,
@@ -35,7 +35,7 @@ import Prelude hiding (length)
 
 data BufferType = File | Add deriving (Eq, Show)
 
--- A piece points to a span in the file buffer or the add buffer
+-- A piece descripter points to a span in the file buffer or add buffer
 data Piece = Piece
   { bufferType :: !BufferType, -- Which buffer
     start :: {-# UNPACK #-} !Int64, -- The offset in the buffer
@@ -57,26 +57,26 @@ data PieceTable = PieceTable
   }
 
 instance Show PieceTable where
-  show = TL.unpack . toText
+  show = TL.unpack . toLazyText
 
 instance IsString PieceTable where
-  fromString = fromText . TL.pack
+  fromString = fromLazyText . TL.pack
 
 -------------------------------------------------------------------------------
 
 empty :: PieceTable
 empty = PieceTable F.empty TL.empty TL.empty 0
 
-fromText :: TL.Text -> PieceTable
-fromText t = PieceTable (F.singleton p) t TL.empty 0
+fromLazyText :: TL.Text -> PieceTable
+fromLazyText t = PieceTable (F.singleton p) t TL.empty 0
   where
     p = Piece File 0 (TL.length t)
 
-toText :: PieceTable -> TL.Text
-toText pt = foldMap (piece pt) pt.table
+toLazyText :: PieceTable -> TL.Text
+toLazyText pt = foldMap (piece pt) pt.table
 
 toString :: PieceTable -> String
-toString = TL.unpack . toText
+toString = TL.unpack . toLazyText
 
 -------------------------------------------------------------------------------
 
@@ -168,7 +168,7 @@ printPT :: PieceTable -> IO ()
 printPT pt = do
   putStrLn "----------------------------------------\n"
   putStrLn "Text sequence:"
-  printTs . toText $ pt
+  printTs . toLazyText $ pt
   putStrLn "File buffer:"
   printTs pt.fileBuffer
   putStrLn "Add buffer:"
