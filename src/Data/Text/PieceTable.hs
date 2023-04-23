@@ -2,17 +2,17 @@
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE StrictData #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE NoFieldSelectors #-}
 
 module Data.Text.PieceTable where
 
 import Control.Arrow
 import Control.Exception (try)
-import Control.Lens hiding ((<|), (|>))
 import Data.ByteString.Lazy qualified as BL
+import Data.Coerce
 import Data.FingerTree ((<|), (><), (|>))
 import Data.FingerTree qualified as F
 import Data.Foldable (toList)
@@ -27,45 +27,32 @@ import Data.Text.Lazy.IO qualified as TLIO
 -------------------------------------------------------------------------------
 -- Types and Instances
 
--- FileType.
 data FileType
-  = Orig -- Original File
-  | Add -- Add File
+  = Original
+  | Add
   deriving (Eq, Show)
 
 -- Each Piece points to a span in the original or add file.
 data Piece = Piece
-  { _fileType :: FileType, -- Which file the Piece refers to.
-    _start :: {-# UNPACK #-} Int64, -- Offset into the the file.
-    _len :: {-# UNPACK #-} Int64 -- The length of the piece.
+  { fileType :: !FileType, -- Which file the Piece refers to.
+    start :: {-# UNPACK #-} !Int64, -- Offset into the the file.
+    length :: {-# UNPACK #-} !Int64 -- The length of the piece.
   }
+  deriving (Show)
 
-makeLenses ''Piece
-
-instance Show Piece where
-  show (Piece f s l) = unwords [show f, show s, show l]
-
--- Measured instance for Piece.
--- Each Piece is measured by its length.
+-- A piece is measured by its length.
 instance F.Measured (Sum Int64) Piece where
-  measure = views len Sum
+  measure p = coerce p.length
+  {-# INLINE measure #-}
 
--- Type synonym for the FingerTree of the Piece.
 type Table = F.FingerTree (Sum Int64) Piece
-
--- Type synonym for the Text.
-type OrigFile = TL.Text
-
-type AddFile = TL.Text
 
 -- The PieceTable.
 data PieceTable = PieceTable
-  { _table :: Table, -- Sequence of the Piece.
-    _origFile :: OrigFile, -- Original file (read only).
-    _addFile :: AddFile -- Add file (append only).
+  { table :: Table,
+    originalFile :: TL.Text, -- read only.
+    addFile :: TL.Text -- append only.
   }
-
-makeLenses ''PieceTable
 
 instance Show PieceTable where
   show = TL.unpack . toText
@@ -84,11 +71,11 @@ empty = PieceTable F.empty TL.empty TL.empty
 fromText :: TL.Text -> PieceTable
 fromText t = PieceTable (F.singleton p) t TL.empty
   where
-    p = Piece Orig 0 (TL.length t)
+    p = Piece Original 0 (TL.length t)
 
 -- Convert PieceTable to Text.
 toText :: PieceTable -> TL.Text
-toText = foldMap <$> (<!>) <*> view table
+toText pt = foldMap (pt <!>) pt.table
 
 toString :: PieceTable -> String
 toString = TL.unpack . toText
@@ -120,16 +107,16 @@ infixl 5 ?>
 infixl 9 <!>
 
 (?>) :: Table -> Piece -> Table
-t ?> p = if p ^. len == 0 then t else t |> p
+t ?> p = if p.length == 0 then t else t |> p
 
 (<?) :: Piece -> Table -> Table
-p <? t = if p ^. len == 0 then t else p <| t
+p <? t = if p.length == 0 then t else p <| t
 
 -- Get the substring that the piece represents.
 (<!>) :: PieceTable -> Piece -> TL.Text
 pt <!> Piece t s l = TL.take l . TL.drop s $ case t of
-  Orig -> pt ^. origFile
-  Add -> pt ^. addFile
+  Original -> pt.originalFile
+  Add -> pt.addFile
 
 -------------------------------------------------------------------------------
 
@@ -141,7 +128,7 @@ splitPiece i (Piece f s l) = (Piece f s i, Piece f (s + i) (l - i))
 splitTable :: Int64 -> Table -> (Table, Table)
 splitTable i t = case F.search (const . (Sum i <)) t of
   F.Position l m r ->
-    let d = i - getSum (F.measure l)
+    let d = i - coerce (F.measure l)
      in (l ?>) *** (<? r) $ splitPiece d m
   F.OnLeft -> (F.empty, t)
   F.OnRight -> (t, F.empty)
@@ -157,15 +144,17 @@ rightOf i = snd . splitTable i
 -- Insert Text at the specified position in the given PieceTable.
 insert :: Int64 -> TL.Text -> PieceTable -> PieceTable
 insert i t pt =
-  pt &~ do
-    let p = Piece Add (views addFile TL.length pt) (TL.length t)
-    table %= uncurry (><) . fmap (p <?) . splitTable i
-    addFile <>= t
+  pt
+    { table = uncurry (><) . fmap (p <?) . splitTable i $ pt.table,
+      addFile = pt.addFile <> t
+    }
+  where
+    p = Piece Add (TL.length $ pt.addFile) (TL.length t)
 
 -- Delete String of the specified range from PieceTable.
 delete :: Int64 -> Int64 -> PieceTable -> PieceTable
 delete i j pt = case compare i j of
-  LT -> pt & table %~ ((><) <$> leftOf i <*> rightOf j)
+  LT -> pt {table = leftOf i pt.table >< rightOf j pt.table}
   EQ -> pt
   GT -> delete j i pt
 
@@ -179,11 +168,11 @@ printPT pt = do
   putStrLn "Text sequence:"
   printTs . toText $ pt
   putStrLn "Original file:"
-  printTs . view origFile $ pt
+  printTs pt.originalFile
   putStrLn "Add file:"
-  printTs . view addFile $ pt
+  printTs pt.addFile
   putStrLn "Table:"
-  mapM_ (putStrLn . ("    " ++) . show) . toList . view table $ pt
+  mapM_ (putStrLn . ("    " ++) . show) . toList $ pt.table
   putStrLn "\n----------------------------------------"
   where
     printTs :: TL.Text -> IO ()

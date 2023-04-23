@@ -37,7 +37,6 @@ library
       base >=4.7 && <5
     , bytestring
     , fingertree
-    , lens
     , text
   default-language: Haskell2010
 
@@ -52,7 +51,6 @@ executable piece-table
       base >=4.7 && <5
     , bytestring
     , fingertree
-    , lens
     , piece-table
     , text
   default-language: Haskell2010
@@ -70,7 +68,6 @@ test-suite piece-table-test
     , base >=4.7 && <5
     , bytestring
     , fingertree
-    , lens
     , piece-table
     , text
   default-language: Haskell2010
